@@ -1,0 +1,6 @@
+@Cryptiq_HostAddress = http://localhost:5144
+
+GET {{Cryptiq_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
