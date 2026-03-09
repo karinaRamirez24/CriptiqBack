@@ -1,5 +1,21 @@
 [
   {
+    "ContainingType": "AuthController",
+    "Method": "Login",
+    "RelativePath": "api/Auth/login",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "loginDto",
+        "Type": "Cryptiq.Dtos.LoginDto",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
     "ContainingType": "CryptiqChatWeb.Controllers.MessagesController",
     "Method": "GetMessage",
     "RelativePath": "api/Messages/{messageId}",

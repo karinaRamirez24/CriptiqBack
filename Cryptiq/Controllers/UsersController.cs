@@ -1,6 +1,7 @@
 ﻿using CryptiqChat.Dtos;
 using CryptiqChat.Models;
 using CryptiqChat.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CryptiqChatWeb.Controllers
@@ -17,6 +18,7 @@ namespace CryptiqChatWeb.Controllers
         }
 
         // CREATE USER - POST api/users 
+        [Authorize]
         [HttpPost]
         public async Task<ActionResult<UserDto>> CreateUser(CreateUserDto dto)
         {
@@ -51,6 +53,7 @@ namespace CryptiqChatWeb.Controllers
 
 
         // UPDATE USER - PUT api/users/{userId}
+        [Authorize]
         [HttpPut("{userId}")]
         public async Task<IActionResult> UpdateUser(Guid userId, [FromBody] User updatedUser)
         {
@@ -63,6 +66,7 @@ namespace CryptiqChatWeb.Controllers
         }
 
         // DELETE USER - DELETE api/users/{userId}
+        [Authorize]
         [HttpDelete("{userId}")]
         public async Task<IActionResult> SoftDeleteUser(Guid userId)
         {
@@ -83,6 +87,7 @@ namespace CryptiqChatWeb.Controllers
         }
 
         // GET api/users/{userId}
+
         [HttpGet("{userId}")]
         public async Task<ActionResult<UserDto>> GetUser(Guid userId)
         {

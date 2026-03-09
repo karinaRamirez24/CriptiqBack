@@ -1,5 +1,6 @@
 ﻿using CryptiqChat.Dtos;
 using CryptiqChat.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 
 namespace CryptiqChat.Hubs
