@@ -14,6 +14,8 @@ namespace CryptiqChat.Dtos
 
         [Phone]
         public string? Phone { get; set; }
+  
+        public DateTime DateOfBirth { get; set; }
 
         public string? ProfilePictureUrl { get; set; }
     }

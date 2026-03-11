@@ -35,6 +35,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
         };
     });
+// Twilio code
+builder.Configuration["Twilio:AccountSid"] = Environment.GetEnvironmentVariable("TWILIO_ACCOUNT_SID");
+builder.Configuration["Twilio:AuthToken"] = Environment.GetEnvironmentVariable("TWILIO_AUTH_TOKEN");
+builder.Configuration["Twilio:FromPhone"] = Environment.GetEnvironmentVariable("TWILIO_FROM_PHONE");
 
 builder.Services.AddAuthorization();
 builder.Services.AddScoped<JwtService>();
@@ -44,6 +48,7 @@ builder.Services.AddDbContext<CryptiqDbContext>(options =>
 
 // Registrar servicios
 builder.Services.AddScoped<ChatService>();
+builder.Services.AddScoped<SmsService>();
 
 // SignalR
 builder.Services.AddSignalR();

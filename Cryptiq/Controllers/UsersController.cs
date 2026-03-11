@@ -3,6 +3,7 @@ using CryptiqChat.Models;
 using CryptiqChat.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Cryptiq.Dtos; 
 
 namespace CryptiqChatWeb.Controllers
 {
@@ -11,19 +12,22 @@ namespace CryptiqChatWeb.Controllers
     public class UsersController : ControllerBase
     {
         private readonly ChatService _chatService;
+        private readonly SmsService _smsService;
 
-        public UsersController(ChatService chatService)
+        public UsersController(ChatService chatService, SmsService smsService)
         {
             _chatService = chatService;
+            _smsService = smsService;
         }
 
         // CREATE USER - POST api/users 
-        [Authorize]
+      
         [HttpPost]
         public async Task<ActionResult<UserDto>> CreateUser(CreateUserDto dto)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
+
             var user = new User
             {
                 Id = Guid.NewGuid(),
@@ -32,8 +36,10 @@ namespace CryptiqChatWeb.Controllers
                 Email = dto.Email,
                 Phone = dto.Phone,
                 ProfilePictureUrl = dto.ProfilePictureUrl,
+                DateOfBirth = dto.DateOfBirth,
                 DateOfRegistration = DateTime.UtcNow,
-                StatusId = 1
+                StatusId = 4,
+                PhoneVerified = false
 
             };
 
@@ -53,7 +59,7 @@ namespace CryptiqChatWeb.Controllers
 
 
         // UPDATE USER - PUT api/users/{userId}
-        [Authorize]
+       // [Authorize]
         [HttpPut("{userId}")]
         public async Task<IActionResult> UpdateUser(Guid userId, [FromBody] User updatedUser)
         {
@@ -63,6 +69,53 @@ namespace CryptiqChatWeb.Controllers
                 return NotFound(new { Message = $"User {userId} not found." });
 
             return NoContent(); // 204 si se actualizó correctamente
+        }
+
+        // SEND VERIFICATION CODE - POST api/users/{userId}/sendVerificationCode
+        [HttpPost("{userId}/sendVerificationCode")]
+        public async Task<IActionResult> SendVerificationCode(Guid userId)
+        {
+            var user = await _chatService.GetUserByIdAsync(userId);
+            if (user == null)
+                return NotFound(new { Message = $"User {userId} not found." });
+
+            var code = new Random().Next(100000, 999999).ToString();
+            var expiration = DateTime.UtcNow.AddMinutes(5);
+
+            await _chatService.SavePhoneVerificationAsync(userId, code, expiration);
+
+            // Normalizar a formato E.164
+            var toPhone = user.Phone.StartsWith("+")
+                ? user.Phone
+                : $"+52{user.Phone}";
+
+            await _smsService.SendSmsAsync(toPhone, $"Tu código de verificación es: {code}");
+
+            return Ok(new { Message = "Código enviado por SMS" });
+        }
+
+        // Verificacion de codigo - POST api/users/{userId}/verifyCode
+        [HttpPost("{userId}/verifyCode")]
+        public async Task<IActionResult> VerifyCode(Guid userId, [FromBody] SmsCodeDto dto)
+        {
+            var user = await _chatService.GetUserByIdAsync(userId);
+            if (user == null)
+                return NotFound(new { Message = $"User {userId} not found." });
+
+            // Usar el servicio para validar
+            var isValid = await _chatService.ValidateCodeAsync(userId, dto.Code);
+
+            if (!isValid)
+                return BadRequest(new { Message = "Código inválido o expirado." });
+
+            // Si es válido, marcar como verificado
+            await _chatService.MarkPhoneAsVerifiedAsync(userId);
+
+            // Actualizar estado del usuario
+            user.StatusId = 6; // Ejemplo: SmsVerified
+            await _chatService.UpdateUserAsync(userId, user);
+
+            return Ok(new { Message = "Teléfono verificado correctamente." });
         }
 
         // DELETE USER - DELETE api/users/{userId}
@@ -78,16 +131,8 @@ namespace CryptiqChatWeb.Controllers
             return NoContent(); // 204
         }
 
-        // GET api/users/{userId}/exists
-        [HttpGet("{userId}/exists")]
-        public async Task<IActionResult> UserExists(Guid userId)
-        {
-            var exists = await _chatService.UserExistsAsync(userId);
-            return Ok(new { UserId = userId, Exists = exists });
-        }
 
         // GET api/users/{userId}
-
         [HttpGet("{userId}")]
         public async Task<ActionResult<UserDto>> GetUser(Guid userId)
         {
@@ -108,6 +153,8 @@ namespace CryptiqChatWeb.Controllers
 
             return Ok(dto);
         }
+
+
 
 
     }

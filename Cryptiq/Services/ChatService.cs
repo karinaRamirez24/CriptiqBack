@@ -1,4 +1,5 @@
-﻿using CryptiqChat.Data;
+﻿using Cryptiq.Models;
+using CryptiqChat.Data;
 using CryptiqChat.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -27,6 +28,77 @@ namespace CryptiqChat.Services
         {
             return await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
         }
+
+        // Guardar código de verificación
+        public async Task SavePhoneVerificationAsync(Guid userId, string code, DateTime expiration)
+        {
+            var verification = new PhoneVerification
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                VerificationCode = code,
+                ExpirationTime = expiration,
+                IsVerified = false,
+                Attempts = 0,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _db.PhoneVerifications.Add(verification);
+            await _db.SaveChangesAsync();
+        }
+
+        // Validar código
+        public async Task<bool> ValidateCodeAsync(Guid userId, string code)
+        {
+            var verification = await _db.PhoneVerifications
+                .Where(v => v.UserId == userId && !v.IsVerified)
+                .OrderByDescending(v => v.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            if (verification == null)
+                return false;
+
+            verification.Attempts++;
+            _db.PhoneVerifications.Update(verification);
+            await _db.SaveChangesAsync();
+
+            if (verification.Attempts > 3)
+                return false; // demasiados intentos
+
+            if (verification.ExpirationTime < DateTime.UtcNow)
+                return false;
+
+            if (verification.VerificationCode != code)
+                return false;
+
+            return true;
+        }
+
+
+        // Marcar teléfono como verificado
+        public async Task MarkPhoneAsVerifiedAsync(Guid userId)
+        {
+            var user = await _db.Users.FindAsync(userId);
+            if (user != null)
+            {
+                user.PhoneVerified = true;
+                _db.Users.Update(user);
+            }
+
+            var verification = await _db.PhoneVerifications
+                .Where(v => v.UserId == userId && !v.IsVerified)
+                .OrderByDescending(v => v.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            if (verification != null)
+            {
+                verification.IsVerified = true;
+                _db.PhoneVerifications.Update(verification);
+            }
+
+            await _db.SaveChangesAsync();
+        }
+
         // ----- Eliminar usuario ───────────────────────────────
         public async Task<bool> SoftDeleteUserAsync(Guid userId)
         {

@@ -310,8 +310,8 @@
         }
       }
     },
-    "/api/Users/{userId}/exists": {
-      "get": {
+    "/api/Users/{userId}/sendVerificationCode": {
+      "post": {
         "tags": [
           "Users"
         ],
@@ -326,6 +326,48 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/Users/{userId}/verifyCode": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmsCodeDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmsCodeDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmsCodeDto"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success"
@@ -400,6 +442,10 @@
             "format": "tel",
             "nullable": true
           },
+          "dateOfBirth": {
+            "type": "string",
+            "format": "date-time"
+          },
           "profilePictureUrl": {
             "type": "string",
             "nullable": true
@@ -413,6 +459,42 @@
           "email": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PhoneVerification": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "verificationCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "expirationTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isVerified": {
+            "type": "boolean"
+          },
+          "attempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
           }
         },
         "additionalProperties": false
@@ -437,6 +519,16 @@
             "items": {
               "$ref": "#/components/schemas/UserRole"
             },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SmsCodeDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
             "nullable": true
           }
         },
@@ -486,6 +578,9 @@
             "type": "integer",
             "format": "int32"
           },
+          "phoneVerified": {
+            "type": "boolean"
+          },
           "inactivatedAt": {
             "type": "string",
             "format": "date-time",
@@ -495,6 +590,13 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/UserRole"
+            },
+            "nullable": true
+          },
+          "phoneVerifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhoneVerification"
             },
             "nullable": true
           }

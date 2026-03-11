@@ -185,15 +185,36 @@
   },
   {
     "ContainingType": "CryptiqChatWeb.Controllers.UsersController",
-    "Method": "UserExists",
-    "RelativePath": "api/Users/{userId}/exists",
-    "HttpMethod": "GET",
+    "Method": "SendVerificationCode",
+    "RelativePath": "api/Users/{userId}/sendVerificationCode",
+    "HttpMethod": "POST",
     "IsController": true,
     "Order": 0,
     "Parameters": [
       {
         "Name": "userId",
         "Type": "System.Guid",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "CryptiqChatWeb.Controllers.UsersController",
+    "Method": "VerifyCode",
+    "RelativePath": "api/Users/{userId}/verifyCode",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "userId",
+        "Type": "System.Guid",
+        "IsRequired": true
+      },
+      {
+        "Name": "dto",
+        "Type": "Cryptiq.Dtos.SmsCodeDto",
         "IsRequired": true
       }
     ],

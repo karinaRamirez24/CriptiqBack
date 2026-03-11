@@ -1,4 +1,5 @@
-﻿using CryptiqChat.Models;
+﻿using Cryptiq.Models;
+using CryptiqChat.Models;
 using Microsoft.EntityFrameworkCore;
 
 
@@ -10,6 +11,11 @@ namespace CryptiqChat.Data
 
         public DbSet<ChatMessage> ChatMessages { get; set; }
         public DbSet<User> Users { get; set; }
+
+        public DbSet<Role> Roles { get; set; }
+        public DbSet<UserRole> UserRoles { get; set; }
+        public DbSet<PhoneVerification> PhoneVerifications { get; set; }
+
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -26,6 +32,7 @@ namespace CryptiqChat.Data
                 entity.Property(u => u.ProfilePictureUrl).HasColumnName("PROFILE_PICTURE_URL");
                 entity.Property(u => u.StatusId).HasColumnName("STATUS_ID");
                 entity.Property(u => u.InactivatedAt).HasColumnName("INACTIVATED_AT");
+                entity.Property(u => u.PhoneVerified).HasColumnName("PHONE_VERIFIED");
             });
 
             modelBuilder.Entity<ChatMessage>(entity =>
@@ -55,7 +62,21 @@ namespace CryptiqChat.Data
             
             modelBuilder.Entity<Role>(entity => { entity.ToTable("ROLES"); entity.Property(r => r.RoleName).HasColumnName("ROLE_NAME"); entity.Property(r => r.StatusId).HasColumnName("STATUS_ID"); });
 
+            modelBuilder.Entity<PhoneVerification>(entity =>
+            {
+                entity.ToTable("PHONE_VERIFICATIONS");
 
+                entity.Property(pv => pv.UserId).HasColumnName("USER_ID");
+                entity.Property(pv => pv.VerificationCode).HasColumnName("VERIFICATION_CODE");
+                entity.Property(pv => pv.ExpirationTime).HasColumnName("EXPIRATION_TIME");
+                entity.Property(pv => pv.IsVerified).HasColumnName("IS_VERIFIED");
+                entity.Property(pv => pv.Attempts).HasColumnName("ATTEMPTS");
+                entity.Property(pv => pv.CreatedAt).HasColumnName("CREATED_AT");
+
+                entity.HasOne(pv => pv.User)
+                      .WithMany(u => u.PhoneVerifications)
+                      .HasForeignKey(pv => pv.UserId);
+            });
         }
 
     }
