@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Cryptiq")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f654bf1caf2fa0135418d5196275e4db64048279")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+619576536bb0105b8ba15fda4e8773c3b78e5df5")]
 [assembly: System.Reflection.AssemblyProductAttribute("Cryptiq")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Cryptiq")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

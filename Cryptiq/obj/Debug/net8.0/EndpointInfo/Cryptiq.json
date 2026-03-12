@@ -569,11 +569,6 @@
             "type": "string",
             "format": "date-time"
           },
-          "lastLogin": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
           "statusId": {
             "type": "integer",
             "format": "int32"

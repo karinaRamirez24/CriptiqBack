@@ -43,7 +43,12 @@ namespace CryptiqChatWeb.Controllers
 
             };
 
-            await _chatService.AddUserAsync(user);
+            var created = await _chatService.AddUserAsync(user);
+
+            if (!created)
+            {
+                return BadRequest("The phone number is already registered.");
+            }
 
             var result = new UserDto
             {
@@ -89,9 +94,9 @@ namespace CryptiqChatWeb.Controllers
                 ? user.Phone
                 : $"+52{user.Phone}";
 
-            await _smsService.SendSmsAsync(toPhone, $"Tu código de verificación es: {code}");
+            await _smsService.SendSmsAsync(toPhone, $"Your verification code is: {code}");
 
-            return Ok(new { Message = "Código enviado por SMS" });
+            return Ok(new { Message = "Code sent by SMS" });
         }
 
         // Verificacion de codigo - POST api/users/{userId}/verifyCode
@@ -106,7 +111,7 @@ namespace CryptiqChatWeb.Controllers
             var isValid = await _chatService.ValidateCodeAsync(userId, dto.Code);
 
             if (!isValid)
-                return BadRequest(new { Message = "Código inválido o expirado." });
+                return BadRequest(new { Message = "Invalid or expired code." });
 
             // Si es válido, marcar como verificado
             await _chatService.MarkPhoneAsVerifiedAsync(userId);
@@ -115,7 +120,7 @@ namespace CryptiqChatWeb.Controllers
             user.StatusId = 6; // Ejemplo: SmsVerified
             await _chatService.UpdateUserAsync(userId, user);
 
-            return Ok(new { Message = "Teléfono verificado correctamente." });
+            return Ok(new { Message = "Phone number verified successfully." });
         }
 
         // DELETE USER - DELETE api/users/{userId}

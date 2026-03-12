@@ -12,16 +12,28 @@ namespace CryptiqChat.Services
         public ChatService(CryptiqDbContext db)
         {
             _db = db;
-            Console.WriteLine($"Conectado a: {_db.Database.GetConnectionString()}");
+            Console.WriteLine($"Connected to {_db.Database.GetConnectionString()}");
         }
 
         // --------------------------------USUARIOS--------------------------------
         // ── Crear usuario ───────────────────────────────
-        public async Task AddUserAsync(User user)
+        // ── Crear usuario con validación de teléfono ───────────────────────────────
+        public async Task<bool> AddUserAsync(User user)
         {
+            // Verificar si ya existe un usuario con ese número de teléfono
+            bool phoneExists = await _db.Users.AnyAsync(u => u.Phone == user.Phone);
+
+            if (phoneExists)
+            {
+                // No permitir la creación
+                return false;
+            }
+
             _db.Users.Add(user);
             await _db.SaveChangesAsync();
+            return true;
         }
+
 
         // ── Obtener usuario por Id ───────────────────────────────
         public async Task<User?> GetUserByIdAsync(Guid userId)
@@ -107,7 +119,6 @@ namespace CryptiqChat.Services
                 return false;
 
             user.StatusId = 2;
-            user.LastLogin = DateTime.UtcNow; 
             await _db.SaveChangesAsync();
             return true;
         }

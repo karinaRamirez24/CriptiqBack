@@ -28,7 +28,6 @@ namespace CryptiqChat.Data
                 entity.Property(u => u.LastName).HasColumnName("LAST_NAME");
                 entity.Property(u => u.DateOfBirth).HasColumnName("DATE_OF_BIRTH");
                 entity.Property(u => u.DateOfRegistration).HasColumnName("DATE_OF_REGISTRATION");
-                entity.Property(u => u.LastLogin).HasColumnName("LAST_LOGIN");
                 entity.Property(u => u.ProfilePictureUrl).HasColumnName("PROFILE_PICTURE_URL");
                 entity.Property(u => u.StatusId).HasColumnName("STATUS_ID");
                 entity.Property(u => u.InactivatedAt).HasColumnName("INACTIVATED_AT");

@@ -13,7 +13,6 @@ namespace CryptiqChat.Models
         public string? ProfilePictureUrl { get; set; }
         public DateTime DateOfBirth { get; set; }
         public DateTime DateOfRegistration { get; set; }
-        public DateTime? LastLogin { get; set; }
         public int StatusId { get; set; }
         public bool PhoneVerified { get; set; }
 
