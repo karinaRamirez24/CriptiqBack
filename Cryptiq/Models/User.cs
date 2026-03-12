@@ -15,9 +15,8 @@ namespace CryptiqChat.Models
         public DateTime DateOfRegistration { get; set; }
         public int StatusId { get; set; }
         public bool PhoneVerified { get; set; }
-
         public DateTime? InactivatedAt { get; set; }
-        public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
+      
         // Relación con PhoneVerifications
         public ICollection<PhoneVerification> PhoneVerifications { get; set; }
     }

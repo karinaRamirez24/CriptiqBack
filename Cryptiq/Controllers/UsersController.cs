@@ -64,17 +64,33 @@ namespace CryptiqChatWeb.Controllers
 
 
         // UPDATE USER - PUT api/users/{userId}
-       // [Authorize]
+        // [Authorize]
         [HttpPut("{userId}")]
-        public async Task<IActionResult> UpdateUser(Guid userId, [FromBody] User updatedUser)
+        public async Task<IActionResult> UpdateUser(Guid userId, [FromBody] UpdateUserDto dto)
         {
-            var result = await _chatService.UpdateUserAsync(userId, updatedUser);
-
-            if (!result)
+            var user = await _chatService.GetUserByIdAsync(userId);
+            if (user == null)
                 return NotFound(new { Message = $"User {userId} not found." });
 
-            return NoContent(); // 204 si se actualizó correctamente
+            // Solo actualiza si el campo viene en el DTO
+            if (!string.IsNullOrEmpty(dto.UserName))
+                user.UserName = dto.UserName;
+
+            if (!string.IsNullOrEmpty(dto.LastName))
+                user.LastName = dto.LastName;
+
+            if (dto.DateOfBirth != default) 
+                user.DateOfBirth = dto.DateOfBirth;
+
+            if (!string.IsNullOrEmpty(dto.ProfilePictureUrl))
+                user.ProfilePictureUrl = dto.ProfilePictureUrl;
+
+            await _chatService.UpdateUserAsync(userId, user);
+            return NoContent();
         }
+
+
+
 
         // SEND VERIFICATION CODE - POST api/users/{userId}/sendVerificationCode
         [HttpPost("{userId}/sendVerificationCode")]
@@ -124,7 +140,7 @@ namespace CryptiqChatWeb.Controllers
         }
 
         // DELETE USER - DELETE api/users/{userId}
-        [Authorize]
+       
         [HttpDelete("{userId}")]
         public async Task<IActionResult> SoftDeleteUser(Guid userId)
         {

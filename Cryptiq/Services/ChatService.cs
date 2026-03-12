@@ -125,10 +125,11 @@ namespace CryptiqChat.Services
 
         // ── UPDATE USER ───────────────────────────────
         public async Task<bool> UpdateUserAsync(Guid userId, User updatedUser)
-        {
+        {   
             var user = await _db.Users.FindAsync(userId);
             if (user == null)
                 return false;
+            bool phoneExists = await _db.Users.AnyAsync(u => u.Phone == user.Phone);
 
             // Actualiza los campos que quieras permitir
             user.UserName = updatedUser.UserName;

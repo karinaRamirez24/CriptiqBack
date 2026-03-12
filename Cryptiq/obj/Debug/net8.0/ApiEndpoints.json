@@ -134,8 +134,8 @@
         "IsRequired": true
       },
       {
-        "Name": "updatedUser",
-        "Type": "CryptiqChat.Models.User",
+        "Name": "dto",
+        "Type": "Cryptiq.Dtos.UpdateUserDto",
         "IsRequired": true
       }
     ],

@@ -89,6 +89,7 @@ builder.Services.AddSwaggerGen(c =>
 
 builder.Services.AddHostedService<UserCleanupService>();
 
+
 var app = builder.Build();
 
 app.UseRouting();

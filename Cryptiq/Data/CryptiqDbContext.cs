@@ -12,8 +12,6 @@ namespace CryptiqChat.Data
         public DbSet<ChatMessage> ChatMessages { get; set; }
         public DbSet<User> Users { get; set; }
 
-        public DbSet<Role> Roles { get; set; }
-        public DbSet<UserRole> UserRoles { get; set; }
         public DbSet<PhoneVerification> PhoneVerifications { get; set; }
 
 
@@ -50,17 +48,7 @@ namespace CryptiqChat.Data
                 entity.Property(m => m.StatusId).HasColumnName("STATUS_ID");
             });
 
-            modelBuilder.Entity<UserRole>(entity =>
-            { 
-                entity.ToTable("USER_ROLES"); 
-                entity.Property(ur => ur.UserId).HasColumnName("USER_ID"); 
-                entity.Property(ur => ur.RoleId).HasColumnName("ROLE_ID"); 
-                entity.HasOne(ur => ur.User).WithMany(u => u.UserRoles).HasForeignKey(ur => ur.UserId); 
-                entity.HasOne(ur => ur.Role).WithMany(r => r.UserRoles).HasForeignKey(ur => ur.RoleId);
-            });
             
-            modelBuilder.Entity<Role>(entity => { entity.ToTable("ROLES"); entity.Property(r => r.RoleName).HasColumnName("ROLE_NAME"); entity.Property(r => r.StatusId).HasColumnName("STATUS_ID"); });
-
             modelBuilder.Entity<PhoneVerification>(entity =>
             {
                 entity.ToTable("PHONE_VERIFICATIONS");

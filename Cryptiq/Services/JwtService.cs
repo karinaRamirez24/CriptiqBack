@@ -19,7 +19,7 @@ public class JwtService
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim("email", user.UserName),
-            new Claim("role", "User") // o dinámico según tu BD
+          
         };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]));
