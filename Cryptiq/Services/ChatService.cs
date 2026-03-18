@@ -149,6 +149,23 @@ namespace CryptiqChat.Services
         }
 
         // --------------------------------MENSAJES--------------------------------
+        // ── Validar si se puede enviar mensaje 1-a-1 ───────────────────────────
+        public async Task<bool> CanSendMessageAsync(Guid senderId, Guid receiverId)
+        {
+            // Verificar que el receptor existe y está activo
+            var receiver = await _db.Users
+                .FirstOrDefaultAsync(u => u.Id == receiverId && u.StatusId == 1);
+
+            if (receiver == null)
+                return false;
+
+            // Si tienes tabla de bloqueos, verificar aquí:
+            // var blocked = await _db.BlockedUsers
+            //     .AnyAsync(b => b.BlockerId == receiverId && b.BlockedId == senderId);
+            // if (blocked) return false;
+
+            return true;
+        }
         // ── Guardar mensaje 1-a-1 con estado ───────────────────────
         public async Task<ChatMessage> SavePrivateMessageAsync(
             Guid senderId, Guid receiverId,

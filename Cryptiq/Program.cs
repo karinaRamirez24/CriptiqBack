@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using StackExchange.Redis;
 using System.Text;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -109,6 +110,31 @@ builder.Services.AddSwaggerGen(c =>
 
 builder.Services.AddHostedService<UserCleanupService>();
 
+// ?? Rate limiting ????????????????????????????????????????????????????
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddPolicy("chat", httpContext =>
+        RateLimitPartition.GetSlidingWindowLimiter(
+            // Clave por usuario autenticado, o por IP si no hay auth
+            partitionKey: httpContext.User?.FindFirst("sub")?.Value
+                       ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                       ?? "anonymous",
+            factory: _ => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 30,   // máx 30 mensajes
+                Window = TimeSpan.FromSeconds(60), // por minuto
+                SegmentsPerWindow = 6,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    // Respuesta cuando se excede el límite
+    options.OnRejected = async (context, token) =>
+    {
+        context.HttpContext.Response.StatusCode = 429;
+        await context.HttpContext.Response.WriteAsync("Demasiados mensajes. Espera un momento.", token);
+    };
+});
 // ?? Pipeline ?????????????????????????????????????????????????????????
 var app = builder.Build();
 
@@ -116,6 +142,7 @@ app.UseRouting();
 app.UseCors("AllowAll");         // CORS siempre antes de Auth
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
@@ -124,6 +151,7 @@ app.UseSwaggerUI(c =>
 });
 
 app.MapControllers();
-app.MapHub<ChatHub>("/hubs/chat");
+app.MapHub<ChatHub>("/hubs/chat")
+    .RequireRateLimiting("chat");
 
 app.Run();

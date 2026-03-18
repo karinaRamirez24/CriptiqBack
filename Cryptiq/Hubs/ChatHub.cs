@@ -3,9 +3,11 @@ using CryptiqChat.Dtos;
 using CryptiqChat.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using System.Security.Claims;
 
 namespace CryptiqChat.Hubs
 {
+    [Authorize]
     public class ChatHub : Hub
     {
         private static readonly Dictionary<string, string> _connectedUsers = new();
@@ -21,31 +23,54 @@ namespace CryptiqChat.Hubs
         // ── Al conectarse ───────────────────────────────────────────
         public override async Task OnConnectedAsync()
         {
-            // ✅ JWT tiene prioridad, query string como fallback
-            var userIdStr = Context.User?.FindFirst("sub")?.Value
-                         ?? Context.GetHttpContext()?.Request.Query["userId"].ToString();
+            // ✅ Leer userId desde el JWT (claim "sub") — es la fuente de verdad
+            var userIdFromJwt = Context.User?.FindFirst("sub")?.Value
+                             ?? Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-            if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out var userGuid))
+            if (string.IsNullOrEmpty(userIdFromJwt) || !Guid.TryParse(userIdFromJwt, out var userGuid))
             {
-                await Clients.Caller.SendAsync("ErrorMessage", new { Code = "INVALID_USERID" });
+                await Clients.Caller.SendAsync("ErrorMessage", new
+                {
+                    Code = "INVALID_TOKEN",
+                    Message = "Token inválido o sin userId."
+                });
                 Context.Abort();
                 return;
             }
 
+            // ✅ Si el cliente también manda userId por query string, verificar que coincida
+            var userIdFromQuery = Context.GetHttpContext()?.Request.Query["userId"].ToString();
+            if (!string.IsNullOrEmpty(userIdFromQuery))
+            {
+                // Comparar como GUID (case-insensitive) en lugar de como string
+                if (!Guid.TryParse(userIdFromQuery, out var queryGuid) || queryGuid != userGuid)
+                {
+                    await Clients.Caller.SendAsync("ErrorMessage", new
+                    {
+                        Code = "USERID_MISMATCH",
+                        Message = "El userId no coincide con el token."
+                    });
+                    Context.Abort();
+                    return;
+                }
+            }
+
+            // A partir de aquí usa siempre userGuid (del JWT), nunca el query string
             var userExists = await _chatService.UserExistsAsync(userGuid);
             if (!userExists)
             {
-                await Clients.Caller.SendAsync("ErrorMessage", new { Code = "USER_NOT_FOUND" });
+                await Clients.Caller.SendAsync("ErrorMessage", new
+                {
+                    Code = "USER_NOT_FOUND",
+                    Message = "Usuario no encontrado."
+                });
                 Context.Abort();
                 return;
             }
 
             await _presenceService.RegisterConnectionAsync(userGuid, Context.ConnectionId);
-            Console.WriteLine($"✅ Conectado: {userGuid} → {Context.ConnectionId}");
+            await Clients.Caller.SendAsync("ConnectedOk", new { UserId = userIdFromJwt });
 
-            await Clients.Caller.SendAsync("ConnectedOk", new { UserId = userIdStr });
-
-            // Entregar mensajes pendientes desde SQL Server
             var pending = await _chatService.GetMessagesByStatusAsync(userGuid, 4);
             foreach (var msg in pending)
             {
@@ -86,18 +111,37 @@ namespace CryptiqChat.Hubs
         public async Task SendPrivateMessage(string receiverId, string encryptedPayload, string qrData)
         {
             // Quién envía → desde Redis
-            var senderIdStr = await _presenceService.GetUserIdByConnectionAsync(Context.ConnectionId);
-            if (string.IsNullOrEmpty(senderIdStr)) return;
+            var senderIdStr = Context.User?.FindFirst("sub")?.Value
+                   ?? Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-            var senderId = Guid.Parse(senderIdStr);
-            var receiverGuid = Guid.Parse(receiverId);
+            if (string.IsNullOrEmpty(senderIdStr) || !Guid.TryParse(senderIdStr, out var senderId))
+            {
+                await Clients.Caller.SendAsync("ErrorMessage", new { Code = "UNAUTHORIZED" });
+                return;
+            }
+
+            if (!Guid.TryParse(receiverId, out var receiverGuid))
+            {
+                await Clients.Caller.SendAsync("ErrorMessage", new { Code = "INVALID_RECEIVER" });
+                return;
+            }
 
             if (senderId == receiverGuid)
             {
                 await Clients.Caller.SendAsync("ErrorMessage", new { Code = "SELF_MESSAGE" });
                 return;
             }
-
+            // Verificar que el usuario receptor existe
+            var canSend = await _chatService.CanSendMessageAsync(senderId, receiverGuid);
+            if (!canSend)
+            {
+                await Clients.Caller.SendAsync("ErrorMessage", new
+                {
+                    Code = "CANNOT_SEND",
+                    Message = "No puedes enviar mensajes a este usuario."
+                });
+                return;
+            }
             // ¿Está online el receptor?
             var receiverConnId = await _presenceService.GetConnectionAsync(receiverGuid);
             var statusId = receiverConnId != null ? 1 : 4; // entregado o pendiente
