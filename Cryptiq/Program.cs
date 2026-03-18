@@ -1,25 +1,25 @@
 using CryptiqChat.Data;
 using CryptiqChat.Hubs;
 using CryptiqChat.Services;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using StackExchange.Redis;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configurar CORS
+// ?? CORS ????????????????????????????????????????????????????????????
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll",
-       policy => policy
-       .AllowAnyHeader()
-       .AllowAnyMethod()
-       .AllowCredentials()
-       .SetIsOriginAllowed(_ => true));
-
+    options.AddPolicy("AllowAll", policy => policy
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials()
+        .SetIsOriginAllowed(_ => true));
 });
-// Configuración JWT
+
+// ?? JWT (un solo bloque, fusionado) ?????????????????????????????????
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -34,33 +34,54 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
         };
+
+        // ? SignalR necesita leer el token desde query string
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var token = context.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(token) &&
+                    context.HttpContext.Request.Path.StartsWithSegments("/hubs/chat"))
+                    context.Token = token;
+                return Task.CompletedTask;
+            }
+        };
     });
-// Twilio code
+
+// ?? Redis ????????????????????????????????????????????????????????????
+var multiplexer = ConnectionMultiplexer.Connect(new ConfigurationOptions
+{
+    EndPoints = { { "redis-18091.c278.us-east-1-4.ec2.cloud.redislabs.com", 18091 } },
+    User = "default",
+    Password = builder.Configuration["Redis:Password"]
+});
+
+builder.Services.AddSingleton<IConnectionMultiplexer>(multiplexer);
+builder.Services.AddSingleton<PresenceService>();
+
+// ?? Twilio ???????????????????????????????????????????????????????????
 builder.Configuration["Twilio:AccountSid"] = Environment.GetEnvironmentVariable("TWILIO_ACCOUNT_SID");
 builder.Configuration["Twilio:AuthToken"] = Environment.GetEnvironmentVariable("TWILIO_AUTH_TOKEN");
 builder.Configuration["Twilio:FromPhone"] = Environment.GetEnvironmentVariable("TWILIO_FROM_PHONE");
 
+// ?? Servicios ????????????????????????????????????????????????????????
 builder.Services.AddAuthorization();
 builder.Services.AddScoped<JwtService>();
-// DbContext con SQL Server
-builder.Services.AddDbContext<CryptiqDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("CryptiqDB")));
-
-// Registrar servicios
 builder.Services.AddScoped<ChatService>();
 builder.Services.AddScoped<SmsService>();
 
-// SignalR
-builder.Services.AddSignalR();
+// ?? Base de datos ????????????????????????????????????????????????????
+builder.Services.AddDbContext<CryptiqDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("CryptiqDB")));
 
-// Controladores REST
+// ?? SignalR y controladores ??????????????????????????????????????????
+builder.Services.AddSignalR();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new() { Title = "Cryptiq API", Version = "v1" });
-
-    // Configuración para el botón Authorize
     c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -68,9 +89,8 @@ builder.Services.AddSwaggerGen(c =>
         Scheme = "Bearer",
         BearerFormat = "JWT",
         In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-        Description = "Introduce el token JWT en el formato: Bearer {token}"
+        Description = "Formato: Bearer {token}"
     });
-
     c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
     {
         {
@@ -89,19 +109,13 @@ builder.Services.AddSwaggerGen(c =>
 
 builder.Services.AddHostedService<UserCleanupService>();
 
-
+// ?? Pipeline ?????????????????????????????????????????????????????????
 var app = builder.Build();
 
 app.UseRouting();
-
-// CORS primero
-app.UseCors("AllowAll");
-
-// Autenticación y autorización
+app.UseCors("AllowAll");         // CORS siempre antes de Auth
 app.UseAuthentication();
 app.UseAuthorization();
-
-// Swagger
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
@@ -113,4 +127,3 @@ app.MapControllers();
 app.MapHub<ChatHub>("/hubs/chat");
 
 app.Run();
-

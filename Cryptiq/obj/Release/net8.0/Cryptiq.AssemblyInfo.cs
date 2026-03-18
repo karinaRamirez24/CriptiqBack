@@ -11,10 +11,11 @@
 using System;
 using System.Reflection;
 
+[assembly: Microsoft.Extensions.Configuration.UserSecrets.UserSecretsIdAttribute("1359a90f-3e03-4c84-bf8f-4e75762a5012")]
 [assembly: System.Reflection.AssemblyCompanyAttribute("Cryptiq")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+cf5f7cbb0f45f760dea35cef23140de900b42946")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0fddff9f8baa767e034a92d4b5d15bc0256deba4")]
 [assembly: System.Reflection.AssemblyProductAttribute("Cryptiq")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Cryptiq")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

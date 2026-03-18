@@ -1,4 +1,5 @@
-﻿using CryptiqChat.Dtos;
+﻿
+using CryptiqChat.Dtos;
 using CryptiqChat.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
@@ -9,164 +10,120 @@ namespace CryptiqChat.Hubs
     {
         private static readonly Dictionary<string, string> _connectedUsers = new();
         private readonly ChatService _chatService;
+        private readonly PresenceService _presenceService;
 
-        public ChatHub(ChatService chatService)
+        public ChatHub(ChatService chatService, PresenceService presenceService)
         {
             _chatService = chatService;
+            _presenceService = presenceService;
         }
 
         // ── Al conectarse ───────────────────────────────────────────
         public override async Task OnConnectedAsync()
         {
-            var userIdStr = Context.GetHttpContext()?.Request.Query["userId"].ToString();
+            // ✅ JWT tiene prioridad, query string como fallback
+            var userIdStr = Context.User?.FindFirst("sub")?.Value
+                         ?? Context.GetHttpContext()?.Request.Query["userId"].ToString();
 
-            // Validar que no esté vacío
-            if (string.IsNullOrEmpty(userIdStr))
+            if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out var userGuid))
             {
-                Console.WriteLine("⚠️ Conexión rechazada: userId vacío");
-                await Clients.Caller.SendAsync("ErrorMessage", new
-                {
-                    Code = "INVALID_USERID",
-                    Message = "You must provide a valid userId (GUID)."
-                });
+                await Clients.Caller.SendAsync("ErrorMessage", new { Code = "INVALID_USERID" });
                 Context.Abort();
                 return;
             }
 
-            // Validar que sea un GUID válido
-            if (!Guid.TryParse(userIdStr, out var userGuid))
-            {
-                Console.WriteLine($"⚠️ Conexión rechazada: userId inválido ({userIdStr})");
-                await Clients.Caller.SendAsync("ErrorMessage", new
-                {
-                    Code = "INVALID_USERID",
-                    Message = "The provided userId is not a valid GUID."
-                });
-                Context.Abort();
-                return;
-            }
-
-            // (Opcional) Validar que el GUID exista en la tabla USERS
             var userExists = await _chatService.UserExistsAsync(userGuid);
             if (!userExists)
             {
-                Console.WriteLine($"⚠️ Conexión rechazada: userId no existe en BD ({userIdStr})");
-                await Clients.Caller.SendAsync("ErrorMessage", new
-                {
-                    Code = "USER_NOT_FOUND",
-                    Message = "The provided userId does not exist in the system."
-                });
+                await Clients.Caller.SendAsync("ErrorMessage", new { Code = "USER_NOT_FOUND" });
                 Context.Abort();
                 return;
             }
 
-            // Si es válido y existe, registrar
-            _connectedUsers[userIdStr] = Context.ConnectionId;
-            Console.WriteLine($"✅ User logged in: {userIdStr}");
+            await _presenceService.RegisterConnectionAsync(userGuid, Context.ConnectionId);
+            Console.WriteLine($"✅ Conectado: {userGuid} → {Context.ConnectionId}");
 
-            // Confirmar conexión válida al cliente
-            await Clients.Caller.SendAsync("ConnectedOk", new
+            await Clients.Caller.SendAsync("ConnectedOk", new { UserId = userIdStr });
+
+            // Entregar mensajes pendientes desde SQL Server
+            var pending = await _chatService.GetMessagesByStatusAsync(userGuid, 4);
+            foreach (var msg in pending)
             {
-                UserId = userIdStr
-            });
-
-            // Buscar mensajes pendientes
-            var pendingMessages = await _chatService.GetMessagesByStatusAsync(userGuid, 4);
-
-            foreach (var msg in pendingMessages)
-            {
-                var message = new
+                await Clients.Caller.SendAsync("ReceivePrivateMessage", new
                 {
-                    Id = msg.Id,
+                    msg.Id,
                     SenderId = msg.SenderId.ToString(),
                     ReceiverId = msg.ReceiverId?.ToString(),
                     Payload = msg.EncryptedPayload,
-                    QrData = msg.QrData,
-                    CreatedAt = msg.CreatedAt,
-                    StatusId = msg.StatusId
-                };
-
-                await Clients.Caller.SendAsync("ReceivePrivateMessage", message);
-
-                // Actualizar estado a entregado
+                    msg.QrData,
+                    msg.CreatedAt,
+                    msg.StatusId
+                });
                 await _chatService.UpdateMessageStatusAsync(msg.Id, 1);
             }
 
             await base.OnConnectedAsync();
         }
 
-
         // ── Al desconectarse ────────────────────────────────────────
+
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
-            var user = _connectedUsers.FirstOrDefault(x => x.Value == Context.ConnectionId);
-            if (user.Key != null)
+            var userIdStr = Context.GetHttpContext()?.Request.Query["userId"].ToString();
+
+            if (Guid.TryParse(userIdStr, out var userGuid))
             {
-                _connectedUsers.Remove(user.Key);
-                Console.WriteLine($"❌ Offline: {user.Key}");
+                // 👉 Aquí eliminas la conexión de Redis
+                await _presenceService.RemoveConnectionAsync(userGuid);
+                Console.WriteLine($"❌ Offline: {userGuid}");
             }
+
             await base.OnDisconnectedAsync(exception);
         }
+
 
         // ── Mensaje privado + guardado en BD ──────────────────────
         public async Task SendPrivateMessage(string receiverId, string encryptedPayload, string qrData)
         {
-            try
+            // Quién envía → desde Redis
+            var senderIdStr = await _presenceService.GetUserIdByConnectionAsync(Context.ConnectionId);
+            if (string.IsNullOrEmpty(senderIdStr)) return;
+
+            var senderId = Guid.Parse(senderIdStr);
+            var receiverGuid = Guid.Parse(receiverId);
+
+            if (senderId == receiverGuid)
             {
-                var senderIdStr = _connectedUsers.FirstOrDefault(x => x.Value == Context.ConnectionId).Key;
-                if (string.IsNullOrEmpty(senderIdStr))
-                {
-                    Console.WriteLine("⚠️ Sender not registered");
-                    return;
-                }
-
-                var senderId = Guid.Parse(senderIdStr);
-                var receiverGuid = Guid.Parse(receiverId);
-
-                if (senderId == receiverGuid)
-                {
-                    Console.WriteLine($"⚠️ User {senderId} tried to send a message to themselves.");
-                    await Clients.Caller.SendAsync("ErrorMessage", new
-                    {
-                        Code = "SELF_MESSAGE",
-                        Message = "You cannot send a private message to yourself."
-                    });
-                    return;
-                }
-
-                // Si el receptor está conectado → entregado (1), si no → pendiente (4)
-                var statusId = _connectedUsers.ContainsKey(receiverId) ? 1 : 4;
-
-                var saved = await _chatService.SavePrivateMessageAsync(
-                    senderId, receiverGuid, encryptedPayload, qrData, statusId);
-
-                // Construir DTO
-                var messageDto = new ChatMessageDto
-                {
-                    Id = saved.Id,
-                    SenderId = senderId,
-                    ReceiverId = receiverGuid,
-                    Payload = encryptedPayload,
-                    QrData = qrData,
-                    CreatedAt = saved.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"),
-                    StatusId = saved.StatusId
-                };
-
-                // Enviar al receptor si está conectado
-                if (_connectedUsers.TryGetValue(receiverId, out var receiverConnectionId))
-                {
-                    await Clients.Client(receiverConnectionId).SendAsync("ReceivePrivateMessage", messageDto);
-                    await _chatService.UpdateMessageStatusAsync(saved.Id, 1); // entregado
-                }
-
-                // Confirmar al remitente
-                await Clients.Caller.SendAsync("MessageSent", messageDto);
+                await Clients.Caller.SendAsync("ErrorMessage", new { Code = "SELF_MESSAGE" });
+                return;
             }
-            catch (Exception ex)
+
+            // ¿Está online el receptor?
+            var receiverConnId = await _presenceService.GetConnectionAsync(receiverGuid);
+            var statusId = receiverConnId != null ? 1 : 4; // entregado o pendiente
+
+            var saved = await _chatService.SavePrivateMessageAsync(
+                senderId, receiverGuid, encryptedPayload, qrData, statusId);
+
+            var dto = new ChatMessageDto
             {
-                Console.WriteLine($"❌ Error en SendPrivateMessage: {ex}");
-                throw; // deja que SignalR lo propague
-            }
+                Id = saved.Id,
+                SenderId = senderId,
+                ReceiverId = receiverGuid,
+                Payload = encryptedPayload,
+                QrData = qrData,
+                CreatedAt = saved.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"),
+                StatusId = saved.StatusId
+            };
+
+            // Entregar si está conectado
+            if (!string.IsNullOrEmpty(receiverConnId))
+                await Clients.Client(receiverConnId).SendAsync("ReceivePrivateMessage", dto);
+
+            await Clients.Caller.SendAsync("MessageSent", dto);
+
+            // Renovar presencia del sender
+            await _presenceService.RefreshPresenceAsync(senderId);
         }
 
 
