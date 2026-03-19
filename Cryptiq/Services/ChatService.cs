@@ -275,5 +275,7 @@ namespace CryptiqChat.Services
             await _db.SaveChangesAsync();
             return true;
         }
+
+      
     }
 }

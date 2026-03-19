@@ -4,25 +4,37 @@ using Microsoft.Extensions.Configuration;
 
 public class SmsService
 {
-    public SmsService()
+    private readonly string _accountSid;
+    private readonly string _authToken;
+    private readonly string _fromPhone;
+
+    public SmsService(IConfiguration config)
     {
-        var accountSid = Environment.GetEnvironmentVariable("TWILIO_ACCOUNT_SID");
-        var authToken = Environment.GetEnvironmentVariable("TWILIO_AUTH_TOKEN");
-        Console.WriteLine($"Twilio Account SID: {accountSid}");
-        Console.WriteLine($"Twilio Auth Token: {authToken}");
-        TwilioClient.Init(accountSid, authToken);
+        _accountSid = config["Twilio:AccountSid"]!;
+        _authToken = config["Twilio:AuthToken"]!;
+        _fromPhone = config["Twilio:FromPhone"]!;
+
+        TwilioClient.Init(_accountSid, _authToken);
     }
 
     public async Task SendSmsAsync(string toPhone, string message)
     {
-        var fromPhone = Environment.GetEnvironmentVariable("TWILIO_FROM_PHONE");
+        // ✅ Formato E.164 para México
+        var formattedTo = toPhone.StartsWith("+") ? toPhone : $"+52{toPhone}";
 
-        await MessageResource.CreateAsync(
-            body: message,
-            from: new Twilio.Types.PhoneNumber(fromPhone),
-            to: new Twilio.Types.PhoneNumber(toPhone)
-        );
+        try
+        {
+            var result = await MessageResource.CreateAsync(
+                body: message,
+                from: new Twilio.Types.PhoneNumber(_fromPhone),
+                to: new Twilio.Types.PhoneNumber(formattedTo)
+            );
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error Twilio: {ex.Message}");
+            throw;
+        }
     }
-
 }
 
