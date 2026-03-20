@@ -1,10 +1,13 @@
-﻿using CryptiqChat.Data;
-using Microsoft.AspNetCore.Mvc;
+﻿using Cryptiq.Common;
+using Cryptiq.Controllers;
 using Cryptiq.Dtos;
+using CryptiqChat.Data;
+using Microsoft.AspNetCore.Mvc;
+
 
 [ApiController]
 [Route("api/[controller]")]
-public class AuthController : ControllerBase
+public class AuthController : BaseController
 {
     private readonly CryptiqDbContext _db;
     private readonly JwtService _jwtService;
@@ -22,7 +25,7 @@ public class AuthController : ControllerBase
 
         var user = _db.Users.FirstOrDefault(u => u.Email.ToLower() == email);
         if (user == null)
-            return Unauthorized(new { Message = "Email no registrado" });
+         return NotFoundResponse(Messages.Auth.EmailNotRegistered);
 
         var token = _jwtService.GenerateJwtToken(user);
         return Ok(new { Token = token });
